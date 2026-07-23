@@ -67,9 +67,15 @@ class PimPage(BasePage):
     def search_employee_by_name(self, name: str):
         self.type_text(self.EMPLOYEE_NAME_SEARCH_INPUT, name)
         try:
-            # If a real match exists, select it from the dropdown so the
-            # field is actually bound to that employee before searching.
-            self.click(self.AUTOCOMPLETE_OPTION, timeout=5)
+            # Confirmed via live inspection that this locator is correct
+            # (.oxd-autocomplete-dropdown .oxd-autocomplete-option matches
+            # the real suggestion rows). The earlier 5s timeout was too
+            # short: this dropdown depends on a live network round-trip
+            # to OrangeHRM's server as you type, which can take longer
+            # than that — especially from a CI runner. If a real match
+            # exists, select it from the dropdown so the field is
+            # actually bound to that employee before searching.
+            self.click(self.AUTOCOMPLETE_OPTION, timeout=15)
         except Exception:
             # No dropdown suggestion appeared — expected for the
             # "no such employee" case, where we want zero results anyway.
