@@ -83,6 +83,30 @@ class PimPage(BasePage):
         self.click(self.SEARCH_BUTTON)
         return self
 
-    def get_result_row_count(self) -> int:
-        rows = self.driver.find_elements(*self.RESULT_TABLE_ROWS)
-        return len(rows)
+    def get_result_row_count(self, timeout=10) -> int:
+        # No wait here previously meant this read the table immediately
+        # after clicking Search — before the network response for the
+        # search request had actually come back, so it would often see
+        # the pre-search (empty) state. Since a legitimate zero-result
+        # search is also a valid outcome we need to support (the
+        # "nonexistent name" test), we can't just wait for >=1 row to
+        # appear. Instead, poll until the row count stabilizes — i.e.
+        # stops changing between checks — which works for both outcomes.
+        import time as _time
+        end_time = _time.monotonic() + timeout
+        previous_count = None
+        stable_since = None
+
+        while _time.monotonic() < end_time:
+            current_count = len(self.driver.find_elements(*self.RESULT_TABLE_ROWS))
+            if current_count == previous_count:
+                if stable_since is None:
+                    stable_since = _time.monotonic()
+                elif _time.monotonic() - stable_since >= 0.6:
+                    return current_count
+            else:
+                stable_since = None
+            previous_count = current_count
+            _time.sleep(0.2)
+
+        return previous_count or 0
