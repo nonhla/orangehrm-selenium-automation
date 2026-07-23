@@ -1,4 +1,6 @@
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from pages.base_page import BasePage
 
 
@@ -20,7 +22,12 @@ class PimPage(BasePage):
     FIRST_NAME_INPUT = (By.NAME, "firstName")
     LAST_NAME_INPUT = (By.NAME, "lastName")
     SAVE_BUTTON = (By.CSS_SELECTOR, "button[type='submit']")
-    EMPLOYEE_FULL_NAME_HEADER = (By.CSS_SELECTOR, ".employee-name-title")
+    # Confirmed from the live personal-details page: the name renders as
+    # an <h6> inside a div.orangehrm-edit-employee-name container. Scoping
+    # to that stable container class rather than the OXD text-utility
+    # classes on the h6 itself (which are more likely to shift between
+    # versions than a semantic container class).
+    EMPLOYEE_FULL_NAME_HEADER = (By.CSS_SELECTOR, ".orangehrm-edit-employee-name h6")
 
     EMPLOYEE_NAME_SEARCH_INPUT = (By.CSS_SELECTOR, ".oxd-autocomplete-wrapper input")
     # The employee-name field is an autocomplete: typing text alone does
@@ -43,6 +50,12 @@ class PimPage(BasePage):
         self.type_text(self.FIRST_NAME_INPUT, first_name)
         self.type_text(self.LAST_NAME_INPUT, last_name)
         self.click(self.SAVE_BUTTON)
+        # Confirm the save actually navigated to the personal-details page
+        # via URL rather than immediately trying to read the name header —
+        # same class of race condition as the earlier PIM navigation fix.
+        WebDriverWait(self.driver, 15).until(
+            EC.url_contains("viewPersonalDetails")
+        )
         return self
 
     def get_employee_full_name(self) -> str:
