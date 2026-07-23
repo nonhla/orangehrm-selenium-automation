@@ -25,9 +25,23 @@ class BasePage:
         )
 
     def click(self, locator, timeout=DEFAULT_TIMEOUT):
-        element = WebDriverWait(self.driver, timeout).until(
-            EC.element_to_be_clickable(locator)
-        )
+        # EC.element_to_be_clickable(locator) only ever inspects the FIRST
+        # element matching the locator. Responsive UIs commonly render a
+        # second, hidden copy of the same button (e.g. a mobile-layout
+        # duplicate) earlier in the DOM — if that hidden one happens to be
+        # the first match, the wait times out even though a perfectly
+        # clickable visible copy exists later on the page. Polling across
+        # ALL matches for the first visible+enabled one avoids that trap.
+        def _first_clickable(driver):
+            for element in driver.find_elements(*locator):
+                try:
+                    if element.is_displayed() and element.is_enabled():
+                        return element
+                except Exception:
+                    continue
+            return False
+
+        element = WebDriverWait(self.driver, timeout).until(_first_clickable)
         element.click()
 
     def type_text(self, locator, text, timeout=DEFAULT_TIMEOUT):
