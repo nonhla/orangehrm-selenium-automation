@@ -59,7 +59,10 @@ class PimPage(BasePage):
         return self
 
     def get_employee_full_name(self) -> str:
-        return self.get_text(self.EMPLOYEE_FULL_NAME_HEADER)
+        # get_nonblank_text rather than get_text: the name populates via a
+        # follow-up API call after the page itself has already rendered,
+        # so a plain visibility check can catch it mid-render, still blank.
+        return self.get_nonblank_text(self.EMPLOYEE_FULL_NAME_HEADER, timeout=15)
 
     def search_employee_by_name(self, name: str):
         self.type_text(self.EMPLOYEE_NAME_SEARCH_INPUT, name)

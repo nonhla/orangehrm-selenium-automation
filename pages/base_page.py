@@ -51,3 +51,21 @@ class BasePage:
 
     def get_text(self, locator, timeout=DEFAULT_TIMEOUT):
         return self.find_visible(locator, timeout).text
+
+    def get_nonblank_text(self, locator, timeout=DEFAULT_TIMEOUT):
+        """Like get_text, but waits for the text to actually be populated.
+
+        In a reactive SPA like OrangeHRM's, an element can become visible
+        in the DOM before its content has finished loading from a
+        follow-up API call — the URL changes, the heading element exists
+        and is visible, but its text is still blank for a moment. A plain
+        visibility wait doesn't catch that; this does.
+        """
+        def _has_text(driver):
+            elements = driver.find_elements(*locator)
+            if not elements:
+                return False
+            text = elements[0].text.strip()
+            return text if text else False
+
+        return WebDriverWait(self.driver, timeout).until(_has_text)
