@@ -1,4 +1,6 @@
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from pages.base_page import BasePage
 
 
@@ -16,11 +18,6 @@ class DashboardPage(BasePage):
     # still matches, whereas an exact text() equality check would silently
     # fail to find anything.
     PIM_MENU_ITEM = (By.XPATH, "//span[normalize-space(.)='PIM']")
-    # Landmark used to confirm navigation actually completed before handing
-    # control back — without this, a broken PIM_MENU_ITEM locator wouldn't
-    # fail here; it would fail confusingly later, on whatever PIM element
-    # the next test tries to interact with.
-    EMPLOYEE_LIST_HEADER = (By.XPATH, "//h6[contains(., 'Employee Information') or contains(., 'Employee List')]")
 
     def get_header_title(self) -> str:
         return self.get_text(self.HEADER_TITLE)
@@ -32,8 +29,12 @@ class DashboardPage(BasePage):
 
     def go_to_pim(self):
         self.click(self.PIM_MENU_ITEM)
-        # Fail here, clearly, if PIM navigation didn't actually complete —
-        # rather than passing silently and leaving every subsequent PIM
-        # locator to time out with no indication of the real cause.
-        self.find_visible(self.EMPLOYEE_LIST_HEADER, timeout=15)
+        # Confirm navigation via URL rather than guessing at page-specific
+        # text — the screenshot evidence showed the Employee List page was
+        # actually loading fine; it was the guessed header text that was
+        # wrong, not the navigation itself. The URL is a much more stable
+        # thing to assert on than copy that can vary by OrangeHRM version.
+        WebDriverWait(self.driver, 15).until(
+            EC.url_contains("viewEmployeeList")
+        )
         return self
