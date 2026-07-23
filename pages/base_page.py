@@ -1,5 +1,7 @@
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import ElementClickInterceptedException
+import time
 
 
 class BasePage:
@@ -42,7 +44,26 @@ class BasePage:
             return False
 
         element = WebDriverWait(self.driver, timeout).until(_first_clickable)
-        element.click()
+
+        # "Element click intercepted" is usually a brief overlay (a sticky
+        # header, a loading spinner, a toast) momentarily covering an
+        # otherwise-valid, visible element — not a wrong locator. Scrolling
+        # it to the center of the viewport and retrying a couple of times
+        # resolves this without masking a genuinely wrong locator, since
+        # _first_clickable above already confirmed the element is real,
+        # displayed, and enabled.
+        last_error = None
+        for attempt in range(3):
+            try:
+                self.driver.execute_script(
+                    "arguments[0].scrollIntoView({block: 'center'});", element
+                )
+                element.click()
+                return
+            except ElementClickInterceptedException as exc:
+                last_error = exc
+                time.sleep(0.5)
+        raise last_error
 
     def type_text(self, locator, text, timeout=DEFAULT_TIMEOUT):
         element = self.find_visible(locator, timeout)
@@ -60,12 +81,20 @@ class BasePage:
         follow-up API call — the URL changes, the heading element exists
         and is visible, but its text is still blank for a moment. A plain
         visibility wait doesn't catch that; this does.
-        """
-        def _has_text(driver):
-            elements = driver.find_elements(*locator)
-            if not elements:
-                return False
-            text = elements[0].text.strip()
-            return text if text else False
 
-        return WebDriverWait(self.driver, timeout).until(_has_text)
+        Checks ALL matching elements (not just the first) for the same
+        reason click() does: a hidden/duplicate copy of the same element
+        earlier in the DOM would otherwise cause this to wait out the
+        full timeout on an element that will never populate.
+        """
+        def _first_nonblank(driver):
+            for element in driver.find_elements(*locator):
+                try:
+                    text = element.text.strip()
+                    if text:
+                        return text
+                except Exception:
+                    continue
+            return False
+
+        return WebDriverWait(self.driver, timeout).until(_first_nonblank)
